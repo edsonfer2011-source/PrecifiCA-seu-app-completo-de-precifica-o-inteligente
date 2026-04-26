@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PrecifiCA — Precificador Inteligente</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #faf8f4;
+  --surface: #ffffff;
+  --surface2: #f4f1eb;
+  --border: rgba(0,0,0,0.08);
+  --border2: rgba(0,0,0,0.15);
+  --text: #1a1814;
+  --muted: #8a8070;
+  --accent: #2d5a3d;
+  --accent2: #e8f5ec;
+  --accent3: #c8e6d0;
+  --gold: #b8860b;
+  --gold-bg: #fdf8e8;
+  --gold-border: #e8d48a;
+  --danger: #8b2020;
+  --danger-bg: #fdf0f0;
+  --warn: #7a4800;
+  --warn-bg: #fff8f0;
+  --warn-border: #f0d0a0;
+  --radius: 14px;
+  --radius-sm: 8px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Jost', sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  line-height: 1.6;
+}
+
+/* ── Noise texture overlay ── */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+  pointer-events: none; z-index: 9999; opacity: 0.5;
+}
+
+/* ── Decorative corner lines ── */
+.corner-tl, .corner-tr, .corner-bl, .corner-br { position: fixed; width: 48px; height: 48px; z-index: 100; pointer-events:none; }
+.corner-tl { top: 20px; left: 20px; border-top: 1px solid var(--border2); border-left: 1px solid var(--border2); }
+.corner-tr { top: 20px; right: 20px; border-top: 1px solid var(--border2); border-right: 1px solid var(--border2); }
+.corner-bl { bottom: 20px; left: 20px; border-bottom: 1px solid var(--border2); border-left: 1px solid var(--border2); }
+.corner-br { bottom: 20px; right: 20px; border-bottom: 1px solid var(--border2); border-right: 1px solid var(--border2); }
+
+/* ── Layout ── */
+.wrap { max-width: 680px; margin: 0 auto; padding: 3rem 1.5rem 6rem; }
+
+/* ── Header ── */
+.header { text-align: center; margin-bottom: 3.5rem; animation: up .7s ease both; }
+.logo-mark {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: 'Playfair Display', serif;
+  font-size: 13px; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 1.5rem;
+}
+.logo-mark::before, .logo-mark::after { content: ''; width: 28px; height: 1px; background: var(--accent3); }
+h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2.4rem, 7vw, 3.6rem);
+  font-weight: 400; line-height: 1.1; margin-bottom: 1rem;
+  letter-spacing: -0.02em; color: var(--text);
+}
+h1 span { font-style: italic; color: var(--accent); }
+.header-sub {
+  font-size: 15px; color: var(--muted); line-height: 1.7; max-width: 440px; margin: 0 auto 1.5rem;
+}
+.badge-privacy {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accent2); border: 1px solid var(--accent3);
+  border-radius: 20px; padding: 5px 14px;
+  font-size: 12px; color: var(--accent); font-weight: 500;
+}
+
+/* ── API card ── */
+.api-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+  animation: up .7s .1s ease both;
+}
+.api-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.api-icon { width: 32px; height: 32px; border-radius: 50%; background: var(--accent2); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.api-label { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.api-row { display: flex; gap: 8px; }
+.api-input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-family: 'Jost', sans-serif; font-size: 13px; padding: 9px 12px;
+  outline: none; transition: border-color .2s;
+}
+.api-input:focus { border-color: var(--accent); }
+.api-input::placeholder { color: var(--muted); }
+.api-save {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-sm); padding: 9px 18px;
+  font-family: 'Jost', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: opacity .2s; white-space: nowrap;
+}
+.api-save:hover { opacity: 0.85; }
+.api-note { font-size: 11px; color: var(--muted); margin-top: 7px; line-height: 1.5; }
+.api-note a { color: var(--accent); }
+
+/* ── Sections ── */
+.section {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden;
+  margin-bottom: 1.25rem;
+  animation: up .7s ease both;
+}
+.section-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 1.25rem 1.5rem; cursor: pointer;
+  border-bottom: 1px solid transparent; transition: background .15s;
+  user-select: none;
+}
+.section-header:hover { background: var(--surface2); }
+.section-header.open { border-bottom-color: var(--border); }
+.section-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 600; color: var(--muted); flex-shrink: 0;
+  transition: all .2s;
+}
+.section-header.done .section-num { background: var(--accent); border-color: var(--accent); color: #fff; }
+.section-title { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; }
+.section-subtitle { font-size: 12px; color: var(--muted); }
+.chevron { font-size: 12px; color: var(--muted); transition: transform .2s; }
+.section-header.open .chevron { transform: rotate(180deg); }
+.section-body { padding: 1.5rem; display: none; }
+.section-body.open { display: block; }
+
+/* ── Form elements ── */
+.field { margin-bottom: 1.25rem; }
+.field:last-child { margin-bottom: 0; }
+.field-label {
+  display: block; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 6px;
+}
+.field-hint { font-size: 12px; color: var(--muted); margin-bottom: 6px; line-height: 1.5; }
+input[type="text"], input[type="number"], select, textarea {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-family: 'Jost', sans-serif; font-size: 14px; padding: 10px 14px;
+  outline: none; transition: border-color .2s, background .2s;
+  appearance: none; -webkit-appearance: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); background: #fff; }
+input::placeholder, textarea::placeholder { color: var(--muted); }
+textarea { resize: vertical; min-height: 80px; }
+select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8070' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media(max-width:480px){ .field-row { grid-template-columns: 1fr; } }
+
+/* ── Cost items ── */
+.cost-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.cost-item {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 8px; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 8px 10px;
+  animation: up .3s ease both;
+}
+.cost-item input { background: transparent; border: none; padding: 0; font-size: 13px; }
+.cost-item input:focus { background: transparent; }
+.cost-item-price { font-size: 13px; font-weight: 500; color: var(--text); min-width: 80px; }
+.cost-item-price input { text-align: right; }
+.cost-remove {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  font-size: 16px; padding: 0 4px; line-height: 1; transition: color .15s;
+}
+.cost-remove:hover { color: var(--danger); }
+.btn-add-cost {
+  background: transparent; border: 1px dashed var(--border2);
+  border-radius: var(--radius-sm); color: var(--muted);
+  font-family: 'Jost', sans-serif; font-size: 13px; padding: 8px;
+  cursor: pointer; width: 100%; transition: all .15s;
+}
+.btn-add-cost:hover { border-color: var(--accent); color: var(--accent); background: var(--accent2); }
+
+/* ── Range slider ── */
+.range-row { display: flex; align-items: center; gap: 12px; }
+input[type="range"] {
+  flex: 1; height: 4px; background: var(--border2);
+  border-radius: 2px; padding: 0; cursor: pointer;
+  appearance: none; -webkit-appearance: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); border: 3px solid #fff;
+  box-shadow: 0 0 0 1px var(--accent); cursor: pointer;
+}
+.range-val {
+  min-width: 44px; text-align: right; font-size: 14px;
+  font-weight: 500; color: var(--accent);
+}
+
+/* ── Info box ── */
+.info-box {
+  background: var(--gold-bg); border: 1px solid var(--gold-border);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+  font-size: 13px; color: var(--gold); line-height: 1.6; margin-bottom: 14px;
+}
+.info-box strong { font-weight: 600; }
+
+/* ── Calculate button ── */
+.btn-calc {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius); padding: 18px 36px;
+  font-family: 'Playfair Display', serif; font-size: 18px;
+  font-style: italic; cursor: pointer; width: 100%;
+  margin-top: 1.5rem; transition: all .2s; letter-spacing: 0.02em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  animation: up .7s .3s ease both;
+}
+.btn-calc:hover { background: #1e3f2b; transform: translateY(-1px); }
+.btn-calc:active { transform: translateY(0) scale(.99); }
+.btn-calc:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ── Loading ── */
+.loading { display: none; text-align: center; padding: 2.5rem 0; animation: up .3s ease both; }
+.loading.show { display: block; }
+.dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 1rem; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); opacity: .3; animation: pulse 1.2s ease infinite; }
+.dot:nth-child(2){ animation-delay:.2s; } .dot:nth-child(3){ animation-delay:.4s; }
+.loading-msg { font-size: 14px; color: var(--muted); font-style: italic; }
+
+/* ── Result ── */
+.result { display: none; animation: up .6s ease both; }
+.result.show { display: block; }
+
+.result-hero {
+  border-radius: var(--radius) var(--radius) 0 0;
+  padding: 2rem 2rem 1.75rem;
+  border: 1px solid; border-bottom: none;
+  text-align: center;
+}
+.result-hero.verde { background: var(--accent2); border-color: var(--accent3); }
+.result-hero.amarelo { background: var(--gold-bg); border-color: var(--gold-border); }
+.result-hero.vermelho { background: var(--danger-bg); border-color: #e0b0b0; }
+
+.verdict-label {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.15em;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.verde .verdict-label { color: var(--accent); }
+.amarelo .verdict-label { color: var(--gold); }
+.vermelho .verdict-label { color: var(--danger); }
+
+.verdict-icon { font-size: 2.5rem; margin-bottom: .5rem; }
+.verdict-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem; font-weight: 400; margin-bottom: .5rem;
+}
+.verde .verdict-title { color: var(--accent); }
+.amarelo .verdict-title { color: var(--gold); }
+.vermelho .verdict-title { color: var(--danger); }
+
+.verdict-phrase { font-size: 14px; color: var(--muted); font-style: italic; }
+
+/* Price breakdown */
+.result-body {
+  background: var(--surface); border: 1px solid var(--border);
+  border-top: none; border-radius: 0 0 var(--radius) var(--radius);
+  padding: 1.75rem 2rem;
+}
+
+.prices-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 1.5rem;
+}
+@media(max-width:480px){ .prices-grid { grid-template-columns: 1fr; } }
+
+.price-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 1rem;
+  text-align: center; transition: border-color .2s;
+}
+.price-card.highlight { background: var(--accent2); border-color: var(--accent3); }
+.price-card-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+.price-card.highlight .price-card-label { color: var(--accent); }
+.price-card-value { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: var(--text); }
+.price-card.highlight .price-card-value { color: var(--accent); }
+.price-card-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.result-section { margin-bottom: 1.5rem; }
+.result-section:last-child { margin-bottom: 0; }
+.result-section-title {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted);
+  margin-bottom: .75rem; display: flex; align-items: center; gap: 8px;
+}
+.result-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+.result-text { font-size: 14px; color: var(--text); line-height: 1.8; }
+
+.breakdown-items { display: flex; flex-direction: column; gap: 6px; }
+.breakdown-row {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border);
+}
+.breakdown-row:last-child { border-bottom: none; }
+.breakdown-row.total { font-weight: 500; padding-top: 8px; }
+.breakdown-row .label { color: var(--muted); }
+.breakdown-row .val { color: var(--text); font-weight: 500; }
+.breakdown-row.total .val { color: var(--accent); }
+
+.tips-list { display: flex; flex-direction: column; gap: 8px; }
+.tip-item {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 13px; color: var(--text); line-height: 1.6;
+}
+.tip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 7px; flex-shrink: 0; }
+
+.alert-box {
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  font-size: 13px; line-height: 1.7; margin-bottom: 1rem;
+}
+.alert-box.warn { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn); }
+.alert-box.good { background: var(--accent2); border: 1px solid var(--accent3); color: var(--accent); }
+
+.btn-new {
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: var(--radius); color: var(--muted);
+  font-family: 'Jost', sans-serif; font-size: 14px;
+  padding: 14px; cursor: pointer; width: 100%; margin-top: 1rem;
+  transition: all .2s;
+}
+.btn-new:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Competitor comparison ── */
+.comp-grid { display: flex; flex-direction: column; gap: 10px; }
+.comp-item {
+  display: grid; grid-template-columns: 1fr auto auto;
+  gap: 12px; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 14px;
+}
+.comp-item.my-price {
+  background: var(--accent2); border-color: var(--accent3);
+}
+.comp-name { font-size: 13px; color: var(--text); }
+.comp-name small { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+.comp-price { font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.comp-item.my-price .comp-price { color: var(--accent); }
+.comp-bar-wrap { width: 80px; }
+.comp-bar-track { height: 4px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+.comp-bar-fill { height: 100%; border-radius: 2px; background: var(--muted); transition: width 1s ease; }
+.comp-item.my-price .comp-bar-fill { background: var(--accent); }
+.comp-tag {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 20px; margin-top: 3px;
+}
+.tag-abaixo { background: #fdf0f0; color: var(--danger); }
+.tag-medio  { background: var(--gold-bg); color: var(--gold); }
+.tag-acima  { background: var(--accent2); color: var(--accent); }
+.comp-source { font-size: 11px; color: var(--muted); margin-top: 6px; font-style: italic; line-height: 1.5; }
+.search-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #f0f4ff; border: 1px solid #c8d8f8;
+  border-radius: 20px; padding: 4px 12px;
+  font-size: 11px; color: #2d4fa0; font-weight: 500; margin-bottom: 12px;
+}
+
+/* ── Export buttons ── */
+.export-bar {
+  display: flex; gap: 10px; margin-top: 1rem; flex-wrap: wrap;
+}
+.btn-export {
+  flex: 1; min-width: 140px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: var(--radius); padding: 13px 20px;
+  font-family: 'Jost', sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: all .2s; border: 1px solid;
+}
+.btn-export-pdf {
+  background: #1a1814; color: #faf8f4; border-color: #1a1814;
+}
+.btn-export-pdf:hover { background: #2d2820; }
+.btn-export-xls {
+  background: var(--accent2); color: var(--accent); border-color: var(--accent3);
+}
+.btn-export-xls:hover { background: var(--accent3); }
+.btn-export-icon { font-size: 16px; }
+.btn-export:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Footer ── */
+footer { text-align: center; margin-top: 3rem; font-size: 12px; color: var(--muted); }
+footer a { color: var(--accent); text-decoration: none; }
+
+/* ── Animations ── */
+@keyframes up { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+@keyframes pulse { 0%,100%{opacity:.3;transform:scale(1)} 50%{opacity:1;transform:scale(1.3)} }
+</style>
+</head>
+<body>
+
+<div class="corner-tl"></div>
+<div class="corner-tr"></div>
+<div class="corner-bl"></div>
+<div class="corner-br"></div>
+
+<div class="wrap">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo-mark">Precificador Inteligente</div>
+    <h1>Descubra o preço<br><span>certo</span> do seu negócio</h1>
+    <p class="header-sub">
+      Responda as perguntas com suas informações reais. A IA calcula o preço viável,
+      explica o raciocínio e dá sugestões práticas — mesmo sem conhecimento técnico.
+    </p>
+    <div class="badge-privacy">🔒 Suas informações não são salvas em nenhum servidor</div>
+  </header>
+
+  <!-- API Key -->
+  <div class="api-card">
+    <div class="api-card-header">
+      <div class="api-icon">🔑</div>
+      <div>
+        <div class="api-label">Chave de API</div>
+      </div>
+    </div>
+    <div class="api-row">
+      <input type="password" class="api-input" id="api-key" placeholder="sk-ant-... (cole sua chave aqui)" />
+      <button class="api-save" onclick="saveKey()">Salvar</button>
+    </div>
+    <p class="api-note">
+      Sua chave fica salva <strong>apenas no seu navegador</strong> — nunca em servidores.
+      Obtenha em <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>.
+      Novo por aqui? Veja o <a href="https://www.anthropic.com/pricing" target="_blank">plano gratuito</a>.
+    </p>
+  </div>
+
+  <!-- STEP 1: O que você vende? -->
+  <div class="section" style="animation-delay:.1s">
+    <div class="section-header" id="h1" onclick="toggleSection(1)">
+      <div class="section-num" id="n1">1</div>
+      <div>
+        <div class="section-title">O que você vende?</div>
+        <div class="section-subtitle">Produto ou serviço, nome e descrição</div>
+      </div>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body" id="b1">
+      <div class="field">
+        <label class="field-label">Tipo</label>
+        <select id="tipo" onchange="updateTipo()">
+          <option value="produto">Produto físico (ex: roupa, bolo, artesanato, comida)</option>
+          <option value="servico">Serviço (ex: corte de cabelo, aula, conserto, consultoria)</option>
+          <option value="digital">Produto digital (ex: curso online, e-book, arte, software)</option>
+          <option value="alimentacao">Alimentação/Gastronomia (ex: marmita, doce, lanche)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="field-label">Nome do produto ou serviço</label>
+        <input type="text" id="nome" placeholder="Ex: Bolo de chocolate decorado, Corte feminino, Curso de Excel..." />
+      </div>
+      <div class="field">
+        <label class="field-label">Descreva brevemente (opcional)</label>
+        <p class="field-hint">Quanto mais detalhes, melhor será a análise da IA.</p>
+        <textarea id="descricao" rows="3" placeholder="Ex: Bolo de 2 andares com pasta americana, serve 50 pessoas, feito sob encomenda..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Custos -->
+  <div class="section" style="animation-delay:.15s">
+    <div class="section-header" id="h2" onclick="toggleSection(2)">
+      <div class="section-num" id="n2">2</div>
+      <div>
+        <div class="section-title">Quanto custa para você produzir?</div>
+        <div class="section-subtitle">Materiais, tempo, despesas</div>
+      </div>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body" id="b2">
+      <div class="info-box">
+        💡 <strong>Dica:</strong> Liste tudo que você gasta para entregar este produto ou serviço. Inclua materiais, embalagem, transporte, taxas de plataforma, etc.
+      </div>
+
+      <div class="field">
+        <label class="field-label">Custos diretos (ingredientes, materiais, insumos)</label>
+        <p class="field-hint">Adicione cada custo separado para ter maior clareza.</p>
+        <div class="cost-items" id="custos-diretos">
+          <div class="cost-item">
+            <input type="text" placeholder="Ex: Farinha de trigo" />
+            <div class="cost-item-price"><input type="number" placeholder="0,00" min="0" step="0.01" /></div>
+            <button class="cost-remove" onclick="removeCost(this)">×</button>
+          </div>
+        </div>
+        <button class="btn-add-cost" onclick="addCost('custos-diretos')">+ Adicionar custo</button>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Seu tempo de trabalho</label>
+        <div class="field-row">
+          <div>
+            <p class="field-hint">Horas necessárias</p>
+            <input type="number" id="horas" placeholder="Ex: 3" min="0" step="0.5" />
+          </div>
+          <div>
+            <p class="field-hint">Quanto quer ganhar por hora (R$)</p>
+            <input type="number" id="valor-hora" placeholder="Ex: 25" min="0" step="1" />
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Custos fixos rateados (opcional)</label>
+        <p class="field-hint">Aluguel, luz, internet, etc. divididos por quantos produtos/serviços você faz por mês.</p>
+        <div class="cost-items" id="custos-fixos"></div>
+        <button class="btn-add-cost" onclick="addCost('custos-fixos')">+ Adicionar custo fixo</button>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Taxa de plataforma ou comissão (%)</label>
+        <p class="field-hint">Se você vende pelo iFood, Mercado Livre, Instagram com link de pagamento, etc. Coloque 0 se vende direto.</p>
+        <input type="number" id="taxa-plataforma" placeholder="Ex: 12" min="0" max="100" step="0.5" />
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 3: Mercado -->
+  <div class="section" style="animation-delay:.2s">
+    <div class="section-header" id="h3" onclick="toggleSection(3)">
+      <div class="section-num" id="n3">3</div>
+      <div>
+        <div class="section-title">Como é o mercado onde você atua?</div>
+        <div class="section-subtitle">Concorrência, público, região</div>
+      </div>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body" id="b3">
+      <div class="field">
+        <label class="field-label">Faixa de preço dos concorrentes (R$)</label>
+        <p class="field-hint">Pesquise o que cobram pelo mesmo produto ou serviço perto de você.</p>
+        <div class="field-row">
+          <div>
+            <p class="field-hint">Preço mínimo que você encontrou</p>
+            <input type="number" id="preco-min" placeholder="Ex: 30" min="0" />
+          </div>
+          <div>
+            <p class="field-hint">Preço máximo que você encontrou</p>
+            <input type="number" id="preco-max" placeholder="Ex: 80" min="0" />
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Posicionamento desejado</label>
+        <select id="posicionamento">
+          <option value="economico">Econômico — quero ser mais barato que a média</option>
+          <option value="medio" selected>Médio — quero cobrar na média do mercado</option>
+          <option value="premium">Premium — meu produto tem qualidade superior, quero cobrar mais</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Margem de lucro desejada (%)</label>
+        <p class="field-hint">Quanto você quer lucrar sobre o custo total. Para iniciantes, 30% a 50% é um bom começo.</p>
+        <div class="range-row">
+          <input type="range" id="margem" min="5" max="200" value="40" step="5" oninput="document.getElementById('margem-val').textContent=this.value+'%'" />
+          <span class="range-val" id="margem-val">40%</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="field-label">Público-alvo</label>
+        <select id="publico">
+          <option value="geral">Público geral — pessoas comuns do dia a dia</option>
+          <option value="jovens">Jovens e estudantes</option>
+          <option value="empresas">Empresas e profissionais (B2B)</option>
+          <option value="alta-renda">Alta renda — clientes que valorizam exclusividade</option>
+          <option value="maes">Mães e famílias</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 4: Contexto adicional -->
+  <div class="section" style="animation-delay:.25s">
+    <div class="section-header" id="h4" onclick="toggleSection(4)">
+      <div class="section-num" id="n4">4</div>
+      <div>
+        <div class="section-title">Alguma dúvida ou contexto especial?</div>
+        <div class="section-subtitle">Opcional — mas ajuda muito a IA</div>
+      </div>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="section-body" id="b4">
+      <div class="field">
+        <label class="field-label">Conte mais sobre sua situação (opcional)</label>
+        <p class="field-hint">Ex: "Estou começando agora", "perdi clientes por cobrar muito caro", "clientes dizem que é caro mas eu acho que é justo", "quero aumentar o preço mas tenho medo"...</p>
+        <textarea id="contexto-extra" rows="4" placeholder="Escreva à vontade. Quanto mais você conta, mais precisa será a análise."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Calc button -->
+  <button class="btn-calc" id="btn-calc" onclick="calcular()">
+    ✦ Calcular meu preço ideal
+  </button>
+
+  <!-- Loading -->
+  <div class="loading" id="loading">
+    <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <p class="loading-msg" id="loading-msg">Analisando seus custos…</p>
+  </div>
+
+  <!-- Error -->
+  <div class="err" id="err"></div>
+
+  <!-- Result -->
+  <div class="result" id="result">
+    <div class="result-hero" id="r-hero">
+      <div class="verdict-label" id="r-veredicto-label"></div>
+      <div class="verdict-icon" id="r-icon"></div>
+      <div class="verdict-title" id="r-titulo"></div>
+      <div class="verdict-phrase" id="r-frase"></div>
+    </div>
+    <div class="result-body">
+      <div class="result-section" id="r-comp-section" style="display:none">
+        <div class="result-section-title">Comparativo com a concorrência</div>
+        <div id="r-comp"></div>
+      </div>
+      <div class="result-section">
+        <div class="result-section-title">Faixa de preço recomendada</div>
+        <div class="prices-grid" id="r-precos"></div>
+      </div>
+      <div class="result-section" id="r-breakdown-section">
+        <div class="result-section-title">Composição do preço</div>
+        <div class="breakdown-items" id="r-breakdown"></div>
+      </div>
+      <div class="result-section">
+        <div class="result-section-title">Análise completa</div>
+        <div class="result-text" id="r-analise"></div>
+      </div>
+      <div class="result-section" id="r-alerta-section" style="display:none">
+        <div class="result-section-title">Atenção</div>
+        <div id="r-alerta"></div>
+      </div>
+      <div class="result-section">
+        <div class="result-section-title">Dicas práticas para você</div>
+        <div class="tips-list" id="r-dicas"></div>
+      </div>
+    </div>
+    <div class="export-bar">
+      <button class="btn-export btn-export-pdf" onclick="exportPDF()">
+        <span class="btn-export-icon">📄</span> Baixar PDF
+      </button>
+      <button class="btn-export btn-export-xls" onclick="exportExcel()">
+        <span class="btn-export-icon">📊</span> Baixar Excel
+      </button>
+    </div>
+    <button class="btn-new" onclick="resetar()">← Calcular outro produto ou serviço</button>
+  </div>
+
+  <footer>
+    <p>PrecifiCA — Feito com <a href="https://claude.ai" target="_blank">Claude AI</a> · Seus dados ficam apenas no seu navegador</p>
+  </footer>
+
+</div>
+
+<script>
+// ── Export helpers ──
+function getDate() {
+  return new Date().toLocaleDateString('pt-BR');
+}
+
+// ── PDF Export ──
+async function exportPDF() {
+  if (!lastResult) return;
+  const btn = document.querySelector('.btn-export-pdf');
+  btn.disabled = true; btn.innerHTML = '<span class="btn-export-icon">⏳</span> Gerando PDF…';
+
+  await new Promise(r => setTimeout(r, 100)); // let UI update
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const r = lastResult, m = lastMercado, d = lastData;
+  const nome = d?.nome || 'Produto/Serviço';
+  const W = 210, margin = 18, cw = W - margin * 2;
+
+  // ── Colors ──
+  const GREEN  = [45, 90, 61];
+  const DARK   = [26, 24, 20];
+  const MUTED  = [138, 128, 112];
+  const LIGHT  = [244, 241, 235];
+  const WHITE  = [255, 255, 255];
+  const GOLD   = [184, 134, 11];
+  const DANGER = [139, 32, 32];
+  const verColor = r.veredicto === 'viavel' ? GREEN : r.veredicto === 'atencao' ? GOLD : DANGER;
+
+  let y = 0;
+
+  function addPage() {
+    doc.addPage();
+    y = margin;
+  }
+  function checkSpace(needed) {
+    if (y + needed > 285) addPage();
+  }
+
+  // ── Cover header ──
+  doc.setFillColor(...GREEN);
+  doc.rect(0, 0, W, 42, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFontSize(22); doc.setFont('helvetica','bold');
+  doc.text('PrecifiCA', margin, 18);
+  doc.setFontSize(10); doc.setFont('helvetica','normal');
+  doc.text('Relatório de Precificação Inteligente', margin, 26);
+  doc.setFontSize(9);
+  doc.text(`Gerado em ${getDate()}`, margin, 34);
+
+  // Verdict badge on cover
+  doc.setFillColor(...verColor);
+  doc.roundedRect(W - margin - 50, 8, 50, 24, 3, 3, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFontSize(8); doc.setFont('helvetica','bold');
+  const vLabel = r.veredicto === 'viavel' ? '✓ VIÁVEL' : r.veredicto === 'atencao' ? '⚠ ATENÇÃO' : '✗ REVISAR';
+  doc.text(vLabel, W - margin - 25, 18, { align:'center' });
+  doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.text(r.icone + ' ' + r.titulo, W - margin - 25, 26, { align:'center', maxWidth:44 });
+
+  y = 52;
+
+  // ── Product name ──
+  doc.setTextColor(...DARK);
+  doc.setFontSize(16); doc.setFont('helvetica','bold');
+  doc.text(nome, margin, y); y += 7;
+  if (d?.descricao) {
+    doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+    const lines = doc.splitTextToSize(d.descricao, cw);
+    doc.text(lines, margin, y); y += lines.length * 5 + 4;
+  }
+  doc.setDrawColor(...LIGHT); doc.setLineWidth(0.4);
+  doc.line(margin, y, W - margin, y); y += 8;
+
+  // ── Price cards ──
+  doc.setTextColor(...DARK);
+  doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('FAIXA DE PREÇO RECOMENDADA', margin, y); y += 6;
+
+  const cardW = (cw - 8) / 3;
+  const cards = [
+    { label:'Mínimo', val: fmt(r.preco_minimo), note:'Sem prejuízo', bg: LIGHT, txt: MUTED },
+    { label:'Recomendado ★', val: fmt(r.preco_recomendado), note:`${(r.margem_real||0).toFixed(0)}% de margem`, bg: GREEN, txt: WHITE },
+    { label:'Premium', val: fmt(r.preco_premium), note:'Teto do mercado', bg: LIGHT, txt: MUTED },
+  ];
+  cards.forEach((c, i) => {
+    const x = margin + i * (cardW + 4);
+    doc.setFillColor(...c.bg); doc.roundedRect(x, y, cardW, 22, 2, 2, 'F');
+    doc.setTextColor(...c.txt);
+    doc.setFontSize(7); doc.setFont('helvetica','bold');
+    doc.text(c.label.toUpperCase(), x + cardW/2, y + 6, { align:'center' });
+    doc.setFontSize(12); doc.setFont('helvetica','bold');
+    doc.text(c.val, x + cardW/2, y + 14, { align:'center' });
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(c.note, x + cardW/2, y + 20, { align:'center' });
+  });
+  y += 30;
+
+  // ── Competitor comparison table ──
+  if (m && m.concorrentes && m.concorrentes.length) {
+    checkSpace(40);
+    doc.setTextColor(...DARK);
+    doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('COMPARATIVO COM A CONCORRÊNCIA', margin, y); y += 2;
+
+    doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(...MUTED);
+    doc.text(`🌐 Dados pesquisados na internet em ${getDate()}`, margin, y + 4); y += 8;
+
+    const compRows = m.concorrentes.map(c => {
+      const diff = m.preco_mercado_medio > 0
+        ? Math.round(((c.preco - m.preco_mercado_medio) / m.preco_mercado_medio) * 100) : 0;
+      const pos = diff < -10 ? 'Abaixo' : diff > 10 ? 'Acima' : 'Na média';
+      return [c.nome, c.fonte, fmt(c.preco), pos, c.detalhe || ''];
+    });
+    compRows.push(['SEU PREÇO ★', 'PrecifiCA', fmt(r.preco_recomendado),
+      r.posicao_mercado === 'abaixo' ? 'Abaixo' : r.posicao_mercado === 'acima' ? 'Acima' : 'Na média', 'Calculado pela IA']);
+
+    doc.autoTable({
+      startY: y,
+      head: [['Produto / Serviço', 'Fonte', 'Preço', 'Posição', 'Detalhe']],
+      body: compRows,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 8, cellPadding: 3, textColor: DARK },
+      headStyles: { fillColor: GREEN, textColor: WHITE, fontStyle: 'bold', fontSize: 8 },
+      columnStyles: { 2: { halign: 'right', fontStyle:'bold' }, 3: { halign:'center' } },
+      didDrawRow: (data) => {
+        if (data.row.index === compRows.length - 1) {
+          doc.setFillColor(...[232,245,236]);
+        }
+      },
+      rowStyles: (row) => row.index === compRows.length - 1 ? { fillColor: [232,245,236], fontStyle:'bold' } : {},
+    });
+    y = doc.lastAutoTable.finalY + 10;
+
+    if (m.contexto_mercado) {
+      checkSpace(20);
+      doc.setFillColor(...LIGHT);
+      doc.roundedRect(margin, y, cw, 14, 2, 2, 'F');
+      doc.setTextColor(...MUTED); doc.setFontSize(8); doc.setFont('helvetica','italic');
+      const ctxLines = doc.splitTextToSize('📌 ' + m.contexto_mercado, cw - 8);
+      doc.text(ctxLines, margin + 4, y + 6);
+      y += ctxLines.length * 5 + 12;
+    }
+  }
+
+  // ── Cost breakdown ──
+  checkSpace(50);
+  doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('COMPOSIÇÃO DO PREÇO', margin, y); y += 6;
+
+  const bkRows = (r.breakdown || []).filter(b => b.val > 0).map(b => [b.label, fmt(b.val)]);
+  bkRows.push(['Preço Final Recomendado', fmt(r.preco_recomendado)]);
+  doc.autoTable({
+    startY: y,
+    head: [['Item', 'Valor']],
+    body: bkRows,
+    margin: { left: margin, right: margin },
+    styles: { fontSize: 9, cellPadding: 3 },
+    headStyles: { fillColor: DARK, textColor: WHITE, fontStyle:'bold' },
+    columnStyles: { 1: { halign:'right', fontStyle:'bold' } },
+    didParseCell: (data) => {
+      if (data.row.index === bkRows.length - 1) {
+        data.cell.styles.fillColor = [232,245,236];
+        data.cell.styles.textColor = GREEN;
+        data.cell.styles.fontStyle = 'bold';
+      }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 10;
+
+  // ── Analysis ──
+  checkSpace(30);
+  doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
+  doc.text('ANÁLISE COMPLETA', margin, y); y += 6;
+  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(60,56,50);
+  const analText = (r.analise || '').replace(/<br>/g,'\n').replace(/<[^>]+>/g,'');
+  const analLines = doc.splitTextToSize(analText, cw);
+  analLines.forEach(line => {
+    checkSpace(6);
+    doc.text(line, margin, y); y += 5.5;
+  });
+  y += 4;
+
+  // ── Tips ──
+  if (r.dicas && r.dicas.length) {
+    checkSpace(20);
+    doc.setTextColor(...DARK); doc.setFontSize(10); doc.setFont('helvetica','bold');
+    doc.text('DICAS PRÁTICAS', margin, y); y += 6;
+    r.dicas.forEach((tip, i) => {
+      checkSpace(14);
+      doc.setFillColor(...LIGHT);
+      const tipLines = doc.splitTextToSize(`${i+1}. ${tip}`, cw - 8);
+      doc.roundedRect(margin, y - 3, cw, tipLines.length * 5.5 + 5, 2, 2, 'F');
+      doc.setFillColor(...GREEN);
+      doc.circle(margin + 3, y + 1, 1.5, 'F');
+      doc.setTextColor(...DARK); doc.setFontSize(9); doc.setFont('helvetica','normal');
+      doc.text(tipLines, margin + 8, y + 2);
+      y += tipLines.length * 5.5 + 8;
+    });
+  }
+
+  // ── Alert ──
+  if (r.alerta && r.alerta.trim()) {
+    checkSpace(18);
+    doc.setFillColor(253, 248, 232);
+    const alertLines = doc.splitTextToSize('⚠ ' + r.alerta, cw - 8);
+    doc.roundedRect(margin, y - 2, cw, alertLines.length * 5.5 + 8, 2, 2, 'F');
+    doc.setDrawColor(...GOLD); doc.setLineWidth(0.6);
+    doc.roundedRect(margin, y - 2, cw, alertLines.length * 5.5 + 8, 2, 2, 'S');
+    doc.setTextColor(...GOLD); doc.setFontSize(9); doc.setFont('helvetica','italic');
+    doc.text(alertLines, margin + 4, y + 4);
+  }
+
+  // ── Footer on every page ──
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...LIGHT); doc.setLineWidth(0.3);
+    doc.line(margin, 287, W - margin, 287);
+    doc.setTextColor(...MUTED); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text('PrecifiCA — Precificador Inteligente com IA', margin, 292);
+    doc.text(`Página ${i} de ${totalPages}`, W - margin, 292, { align:'right' });
+  }
+
+  doc.save(`precifica-${nome.replace(/\s+/g,'-').toLowerCase()}-${getDate().replace(/\//g,'-')}.pdf`);
+  btn.disabled = false; btn.innerHTML = '<span class="btn-export-icon">📄</span> Baixar PDF';
+}
+
+// ── Excel Export ──
+function exportExcel() {
+  if (!lastResult) return;
+  const btn = document.querySelector('.btn-export-xls');
+  btn.disabled = true; btn.innerHTML = '<span class="btn-export-icon">⏳</span> Gerando Excel…';
+
+  const r = lastResult, m = lastMercado, d = lastData;
+  const nome = d?.nome || 'Produto/Serviço';
+  const wb = XLSX.utils.book_new();
+
+  // ── ABA 1: Resumo ──
+  const resumoData = [
+    ['PrecifiCA — Relatório de Precificação'],
+    [`Gerado em: ${getDate()}`],
+    [],
+    ['PRODUTO / SERVIÇO', nome],
+    ['Tipo', d?.tipo || ''],
+    ['Descrição', d?.descricao || ''],
+    [],
+    ['RESULTADO', r.veredicto?.toUpperCase()],
+    ['Veredicto', r.titulo],
+    [],
+    ['PREÇOS RECOMENDADOS', ''],
+    ['Preço Mínimo (sem prejuízo)', r.preco_minimo],
+    ['Preço Recomendado ★', r.preco_recomendado],
+    ['Preço Premium', r.preco_premium],
+    [],
+    ['DADOS DE CUSTO', ''],
+    ['Custo total de produção', d?.custoTotal || 0],
+    ['Horas trabalhadas', d?.horas || 0],
+    ['Valor por hora (R$)', d?.valorHora || 0],
+    ['Taxa de plataforma (%)', d?.taxaPlataforma || 0],
+    ['Margem de lucro desejada (%)', d?.margemDesejada || 0],
+    ['Margem real obtida (%)', r.margem_real || 0],
+    ['Lucro no preço recomendado (R$)', r.lucro_no_recomendado || 0],
+    [],
+    ['ANÁLISE'],
+    [(r.analise || '').replace(/<[^>]+>/g,'')],
+    [],
+    ['DICAS PRÁTICAS'],
+    ...(r.dicas || []).map((d,i) => [`${i+1}. ${d}`]),
+  ];
+  if (r.alerta) { resumoData.push([], ['ALERTA', r.alerta]); }
+
+  const wsResumo = XLSX.utils.aoa_to_sheet(resumoData);
+  wsResumo['!cols'] = [{ wch: 35 }, { wch: 60 }];
+  // Style header
+  if (wsResumo['A1']) { wsResumo['A1'].s = { font:{ bold:true, sz:14 }, fill:{ fgColor:{ rgb:'2D5A3D' } }, font:{ color:{ rgb:'FFFFFF'}, bold:true, sz:14 } }; }
+  XLSX.utils.book_append_sheet(wb, wsResumo, 'Resumo');
+
+  // ── ABA 2: Composição do Preço ──
+  const bkData = [
+    ['COMPOSIÇÃO DO PREÇO — ' + nome],
+    [],
+    ['Item de Custo / Lucro', 'Valor (R$)', '% do Preço Final'],
+    ...(r.breakdown || []).filter(b => b.val > 0).map(b => [
+      b.label,
+      b.val,
+      r.preco_recomendado > 0 ? +((b.val / r.preco_recomendado) * 100).toFixed(1) : 0
+    ]),
+    [],
+    ['PREÇO FINAL RECOMENDADO', r.preco_recomendado, 100],
+  ];
+  const wsBk = XLSX.utils.aoa_to_sheet(bkData);
+  wsBk['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsBk, 'Composição do Preço');
+
+  // ── ABA 3: Comparativo de Mercado ──
+  if (m && m.concorrentes && m.concorrentes.length) {
+    const compData = [
+      ['COMPARATIVO COM A CONCORRÊNCIA'],
+      [`Pesquisa realizada em: ${getDate()}`],
+      [`Fontes consultadas: ${(m.fontes_consultadas||[]).join(', ')}`],
+      [],
+      ['ESTATÍSTICAS DE MERCADO', ''],
+      ['Preço mínimo encontrado', m.preco_mercado_min],
+      ['Preço máximo encontrado', m.preco_mercado_max],
+      ['Preço médio de mercado', m.preco_mercado_medio],
+      ['Seu preço recomendado', r.preco_recomendado],
+      [],
+      ['CONCORRENTES ENCONTRADOS'],
+      ['Nome / Produto', 'Plataforma / Fonte', 'Preço (R$)', 'Posição no mercado', 'Detalhes'],
+      ...m.concorrentes.map(c => {
+        const diff = m.preco_mercado_medio > 0
+          ? Math.round(((c.preco - m.preco_mercado_medio) / m.preco_mercado_medio) * 100) : 0;
+        const pos = diff < -10 ? 'Abaixo da média' : diff > 10 ? 'Acima da média' : 'Na média';
+        return [c.nome, c.fonte, c.preco, pos, c.detalhe || ''];
+      }),
+      ['SEU PREÇO ★ (PrecifiCA)', 'Calculado pela IA', r.preco_recomendado,
+        r.posicao_mercado === 'abaixo' ? 'Abaixo da média' : r.posicao_mercado === 'acima' ? 'Acima da média' : 'Na média',
+        `Margem: ${(r.margem_real||0).toFixed(0)}%`
+      ],
+      [],
+      ['CONTEXTO DE MERCADO'],
+      [m.contexto_mercado || ''],
+    ];
+    const wsComp = XLSX.utils.aoa_to_sheet(compData);
+    wsComp['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }, { wch: 20 }, { wch: 40 }];
+    XLSX.utils.book_append_sheet(wb, wsComp, 'Comparativo de Mercado');
+  }
+
+  // ── ABA 4: Dados Brutos ──
+  const rawData = [
+    ['DADOS DO FORMULÁRIO'],
+    [],
+    ['Campo', 'Valor'],
+    ['Nome', d?.nome || ''],
+    ['Tipo', d?.tipo || ''],
+    ['Descrição', d?.descricao || ''],
+    ['Custo materiais/diretos (R$)', d?.custosDiretos || 0],
+    ['Custo fixos rateados (R$)', d?.custosFixos || 0],
+    ['Horas trabalhadas', d?.horas || 0],
+    ['Valor por hora (R$)', d?.valorHora || 0],
+    ['Custo mão de obra (R$)', d?.custoMaoDeObra || 0],
+    ['Custo total (R$)', d?.custoTotal || 0],
+    ['Taxa de plataforma (%)', d?.taxaPlataforma || 0],
+    ['Margem desejada (%)', d?.margemDesejada || 0],
+    ['Posicionamento', d?.posicionamento || ''],
+    ['Público-alvo', d?.publico || ''],
+    ['Preço mínimo concorrentes (R$)', d?.precoMin || 0],
+    ['Preço máximo concorrentes (R$)', d?.precoMax || 0],
+  ];
+  if (d?.cdItems?.length) {
+    rawData.push([], ['DETALHAMENTO DOS CUSTOS DIRETOS'], ['Item', 'Valor (R$)']);
+    d.cdItems.forEach(i => rawData.push([i.label, i.val]));
+  }
+  if (d?.cfItems?.length) {
+    rawData.push([], ['DETALHAMENTO DOS CUSTOS FIXOS'], ['Item', 'Valor (R$)']);
+    d.cfItems.forEach(i => rawData.push([i.label, i.val]));
+  }
+  const wsRaw = XLSX.utils.aoa_to_sheet(rawData);
+  wsRaw['!cols'] = [{ wch: 35 }, { wch: 30 }];
+  XLSX.utils.book_append_sheet(wb, wsRaw, 'Dados do Formulário');
+
+  XLSX.writeFile(wb, `precifica-${nome.replace(/\s+/g,'-').toLowerCase()}-${getDate().replace(/\//g,'-')}.xlsx`);
+  btn.disabled = false; btn.innerHTML = '<span class="btn-export-icon">📊</span> Baixar Excel';
+}
+let apiKey = localStorage.getItem('precifica_key') || '';
+if (apiKey) document.getElementById('api-key').value = apiKey;
+
+// Open first section by default
+toggleSection(1);
+
+function saveKey() {
+  const k = document.getElementById('api-key').value.trim();
+  if (k) {
+    localStorage.setItem('precifica_key', k);
+    apiKey = k;
+    const btn = document.querySelector('.api-save');
+    btn.textContent = '✓ Salvo';
+    setTimeout(() => btn.textContent = 'Salvar', 2000);
+  }
+}
+
+// ── Sections ──
+function toggleSection(n) {
+  const h = document.getElementById('h'+n);
+  const b = document.getElementById('b'+n);
+  const isOpen = b.classList.contains('open');
+  b.classList.toggle('open', !isOpen);
+  h.classList.toggle('open', !isOpen);
+}
+
+// ── Cost items ──
+function addCost(containerId) {
+  const c = document.getElementById(containerId);
+  const div = document.createElement('div');
+  div.className = 'cost-item';
+  div.innerHTML = `
+    <input type="text" placeholder="Descreva o custo" />
+    <div class="cost-item-price"><input type="number" placeholder="0,00" min="0" step="0.01" /></div>
+    <button class="cost-remove" onclick="removeCost(this)">×</button>`;
+  c.appendChild(div);
+  div.querySelector('input').focus();
+}
+
+function removeCost(btn) {
+  btn.closest('.cost-item').remove();
+}
+
+// ── Collect data ──
+function collectData() {
+  const getNum = id => parseFloat(document.getElementById(id)?.value) || 0;
+
+  // Custos diretos
+  let custosDiretos = 0;
+  const cdItems = [];
+  document.querySelectorAll('#custos-diretos .cost-item').forEach(item => {
+    const label = item.querySelector('input[type=text]').value.trim();
+    const val = parseFloat(item.querySelector('input[type=number]').value) || 0;
+    if (val > 0) { custosDiretos += val; cdItems.push({ label: label||'Item', val }); }
+  });
+
+  // Custos fixos
+  let custosFixos = 0;
+  const cfItems = [];
+  document.querySelectorAll('#custos-fixos .cost-item').forEach(item => {
+    const label = item.querySelector('input[type=text]').value.trim();
+    const val = parseFloat(item.querySelector('input[type=number]').value) || 0;
+    if (val > 0) { custosFixos += val; cfItems.push({ label: label||'Fixo', val }); }
+  });
+
+  const horas = getNum('horas');
+  const valorHora = getNum('valor-hora');
+  const custoMaoDeObra = horas * valorHora;
+  const taxaPlataforma = getNum('taxa-plataforma');
+  const margemDesejada = getNum('margem');
+  const precoMin = getNum('preco-min');
+  const precoMax = getNum('preco-max');
+  const custoTotal = custosDiretos + custosFixos + custoMaoDeObra;
+
+  return {
+    tipo: document.getElementById('tipo').value,
+    nome: document.getElementById('nome').value.trim() || 'Produto/Serviço',
+    descricao: document.getElementById('descricao').value.trim(),
+    custosDiretos, cdItems, custosFixos, cfItems,
+    horas, valorHora, custoMaoDeObra, taxaPlataforma,
+    margemDesejada, precoMin, precoMax, custoTotal,
+    posicionamento: document.getElementById('posicionamento').value,
+    publico: document.getElementById('publico').value,
+    contextoExtra: document.getElementById('contexto-extra').value.trim()
+  };
+}
+
+// ── Loading messages ──
+const loadPhases = [
+  { msg: '🔍 Pesquisando preços no mercado…', dur: 0 },
+  { msg: '🔍 Buscando concorrentes online…', dur: 3000 },
+  { msg: '📊 Comparando com o mercado…', dur: 6000 },
+  { msg: '🧮 Calculando sua precificação…', dur: 10000 },
+  { msg: '✍️ Preparando análise completa…', dur: 14000 },
+];
+let loadTimer;
+function startLoadAnim() {
+  loadPhases.forEach(p => {
+    const t = setTimeout(() => {
+      document.getElementById('loading-msg').textContent = p.msg;
+    }, p.dur);
+    loadTimers = loadTimers || [];
+    loadTimers.push(t);
+  });
+}
+let loadTimers = [];
+function stopLoadAnim() {
+  (loadTimers||[]).forEach(clearTimeout);
+  loadTimers = [];
+}
+
+// ── Collect data ──
+function collectData() {
+  const getNum = id => parseFloat(document.getElementById(id)?.value) || 0;
+  let custosDiretos = 0; const cdItems = [];
+  document.querySelectorAll('#custos-diretos .cost-item').forEach(item => {
+    const label = item.querySelector('input[type=text]').value.trim();
+    const val = parseFloat(item.querySelector('input[type=number]').value) || 0;
+    if (val > 0) { custosDiretos += val; cdItems.push({ label: label||'Item', val }); }
+  });
+  let custosFixos = 0; const cfItems = [];
+  document.querySelectorAll('#custos-fixos .cost-item').forEach(item => {
+    const label = item.querySelector('input[type=text]').value.trim();
+    const val = parseFloat(item.querySelector('input[type=number]').value) || 0;
+    if (val > 0) { custosFixos += val; cfItems.push({ label: label||'Fixo', val }); }
+  });
+  const horas = getNum('horas'), valorHora = getNum('valor-hora');
+  const custoMaoDeObra = horas * valorHora;
+  const taxaPlataforma = getNum('taxa-plataforma');
+  const margemDesejada = getNum('margem');
+  const precoMin = getNum('preco-min'), precoMax = getNum('preco-max');
+  const custoTotal = custosDiretos + custosFixos + custoMaoDeObra;
+  return {
+    tipo: document.getElementById('tipo').value,
+    nome: document.getElementById('nome').value.trim() || 'Produto/Serviço',
+    descricao: document.getElementById('descricao').value.trim(),
+    custosDiretos, cdItems, custosFixos, cfItems,
+    horas, valorHora, custoMaoDeObra, taxaPlataforma,
+    margemDesejada, precoMin, precoMax, custoTotal,
+    posicionamento: document.getElementById('posicionamento').value,
+    publico: document.getElementById('publico').value,
+    contextoExtra: document.getElementById('contexto-extra').value.trim()
+  };
+}
+
+// ── Format currency ──
+const fmt = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+// ── API call helper ──
+async function callAPI(key, messages, useWebSearch = false) {
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 3000,
+    messages
+  };
+  if (useWebSearch) {
+    body.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+  }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': key,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true'
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(()=>({}));
+    throw new Error(e.error?.message || 'Erro ' + res.status);
+  }
+  return res.json();
+}
+
+// ── Extract text from content blocks ──
+function extractText(content) {
+  return content.filter(b => b.type === 'text').map(b => b.text).join('\n');
+}
+
+// ── Main calculate (two-phase) ──
+async function calcular() {
+  const key = document.getElementById('api-key').value.trim() || apiKey;
+  document.getElementById('err').classList.remove('show');
+  if (!key) { showErr('Insira sua chave de API Anthropic para continuar.'); return; }
+  const d = collectData();
+  if (!d.nome || d.nome === 'Produto/Serviço') {
+    document.getElementById('b1').classList.add('open');
+    document.getElementById('h1').classList.add('open');
+    showErr('Preencha pelo menos o nome do produto ou serviço no Passo 1.');
+    return;
+  }
+
+  document.getElementById('btn-calc').disabled = true;
+  document.getElementById('loading').classList.add('show');
+  document.getElementById('result').classList.remove('show');
+  startLoadAnim();
+
+  try {
+    // ── FASE 1: Web search — pesquisar preços de mercado ──
+    const tipoLabel = { produto:'produto físico', servico:'serviço', digital:'produto digital', alimentacao:'alimento/gastronomia' }[d.tipo];
+    const searchPrompt = `Pesquise na internet preços praticados no Brasil para: "${d.nome}" (${tipoLabel}).
+${d.descricao ? `Descrição: ${d.descricao}` : ''}
+
+Use a ferramenta de busca web para encontrar:
+1. Preços reais praticados por vendedores/prestadores brasileiros (iFood, Mercado Livre, OLX, Instagram, sites de serviço, etc.)
+2. Faixa de preço mínima e máxima encontrada
+3. Preço médio praticado
+4. 3 a 5 exemplos concretos com nome do produto/serviço, preço e fonte
+
+Após pesquisar, retorne SOMENTE este JSON (sem markdown, sem texto extra):
+{
+  "pesquisa_realizada": true,
+  "fontes_consultadas": ["site1", "site2"],
+  "preco_mercado_min": número,
+  "preco_mercado_max": número,
+  "preco_mercado_medio": número,
+  "concorrentes": [
+    { "nome": "nome do produto/serviço/vendedor", "preco": número, "fonte": "site ou plataforma", "detalhe": "breve descrição" }
+  ],
+  "contexto_mercado": "1 parágrafo descrevendo o mercado encontrado, tendências, variações de preço"
+}`;
+
+    const fase1Data = await callAPI(key, [{ role: 'user', content: searchPrompt }], true);
+    const fase1Text = extractText(fase1Data.content);
+    let mercado = null;
+    try {
+      const clean = fase1Text.replace(/```json|```/g,'').trim();
+      const jsonStart = clean.indexOf('{');
+      mercado = JSON.parse(clean.slice(jsonStart));
+    } catch(e) {
+      // se a fase 1 falhar, continua sem dados de mercado
+      mercado = null;
+    }
+
+    // ── FASE 2: Calcular precificação com dados do mercado ──
+    const tipoMap = { produto:'Produto físico', servico:'Serviço', digital:'Produto digital', alimentacao:'Alimentação/Gastronomia' };
+    const posMap = { economico:'Econômico', medio:'Médio', premium:'Premium' };
+    const pubMap = { geral:'Público geral', jovens:'Jovens/estudantes', empresas:'Empresas (B2B)', 'alta-renda':'Alta renda', maes:'Mães e famílias' };
+
+    let costDetails = '';
+    if (d.cdItems.length) costDetails += '\nCustos diretos:\n' + d.cdItems.map(i=>`  - ${i.label}: R$ ${i.val.toFixed(2)}`).join('\n');
+    if (d.cfItems.length) costDetails += '\nCustos fixos:\n' + d.cfItems.map(i=>`  - ${i.label}: R$ ${i.val.toFixed(2)}`).join('\n');
+    if (d.horas > 0) costDetails += `\nMão de obra: ${d.horas}h × R$ ${d.valorHora}/h = R$ ${d.custoMaoDeObra.toFixed(2)}`;
+
+    const mercadoCtx = mercado ? `
+DADOS REAIS DO MERCADO (pesquisados agora na internet):
+- Preço mínimo encontrado: R$ ${mercado.preco_mercado_min}
+- Preço máximo encontrado: R$ ${mercado.preco_mercado_max}
+- Preço médio de mercado: R$ ${mercado.preco_mercado_medio}
+- Fontes: ${(mercado.fontes_consultadas||[]).join(', ')}
+- Contexto: ${mercado.contexto_mercado}
+` : `
+DADOS DO MERCADO (informados pelo usuário):
+- Faixa de preço dos concorrentes: R$ ${d.precoMin} a R$ ${d.precoMax}
+`;
+
+    const fase2Prompt = `Você é especialista em precificação para pequenos negócios brasileiros. Com base nos dados abaixo, calcule o preço ideal e retorne SOMENTE um JSON válido.
+
+DADOS DO NEGÓCIO:
+- Tipo: ${tipoMap[d.tipo]}
+- Nome: ${d.nome}
+${d.descricao ? `- Descrição: ${d.descricao}` : ''}
+- Custo total de produção: R$ ${d.custoTotal.toFixed(2)}${costDetails}
+- Taxa de plataforma/comissão: ${d.taxaPlataforma}%
+- Margem de lucro desejada: ${d.margemDesejada}%
+- Posicionamento: ${posMap[d.posicionamento]}
+- Público-alvo: ${pubMap[d.publico]}
+${d.contextoExtra ? `- Contexto: ${d.contextoExtra}` : ''}
+${mercadoCtx}
+
+Retorne SOMENTE este JSON:
+{
+  "veredicto": "viavel" | "atencao" | "inviavel",
+  "icone": "✅" | "⚠️" | "❌",
+  "titulo": "Frase curta e direta sobre o resultado",
+  "frase": "Frase motivacional de apoio",
+  "preco_minimo": número,
+  "preco_recomendado": número,
+  "preco_premium": número,
+  "lucro_no_recomendado": número,
+  "margem_real": número,
+  "posicao_mercado": "abaixo" | "medio" | "acima",
+  "analise": "3 a 4 parágrafos em linguagem simples falando diretamente com o empreendedor, mencionando os dados reais do mercado encontrados",
+  "alerta": "Alerta crítico se necessário, ou string vazia",
+  "dicas": ["dica 1","dica 2","dica 3","dica 4"],
+  "breakdown": [
+    {"label":"Custos diretos","val":número},
+    {"label":"Mão de obra","val":número},
+    {"label":"Custos fixos","val":número},
+    {"label":"Taxa de plataforma","val":número},
+    {"label":"Lucro","val":número}
+  ]
+}`;
+
+    const fase2Data = await callAPI(key, [{ role: 'user', content: fase2Prompt }], false);
+    const fase2Text = extractText(fase2Data.content);
+    const clean2 = fase2Text.replace(/```json|```/g,'').trim();
+    const r = JSON.parse(clean2.slice(clean2.indexOf('{')));
+
+    renderResult(r, d, mercado);
+
+  } catch(e) {
+    showErr('Erro: ' + e.message);
+  } finally {
+    stopLoadAnim();
+    document.getElementById('loading').classList.remove('show');
+    document.getElementById('btn-calc').disabled = false;
+  }
+}
+
+// ── Global result store ──
+let lastResult = null;
+let lastMercado = null;
+let lastData = null;
+
+function renderResult(r, d, mercado) {
+  lastResult = r; lastMercado = mercado; lastData = d;
+  const heroEl = document.getElementById('r-hero');
+  const map = { viavel:'verde', atencao:'amarelo', inviavel:'vermelho' };
+  const cls = map[r.veredicto] || 'amarelo';
+
+  heroEl.className = 'result-hero ' + cls;
+  document.getElementById('r-veredicto-label').textContent =
+    r.veredicto === 'viavel' ? 'Preço viável ✓' :
+    r.veredicto === 'atencao' ? 'Requer atenção' : 'Revisar custos';
+  document.getElementById('r-icon').textContent = r.icone;
+  document.getElementById('r-titulo').textContent = r.titulo;
+  document.getElementById('r-frase').textContent = r.frase;
+
+  // ── Competitor comparison ──
+  const compSection = document.getElementById('r-comp-section');
+  const compEl = document.getElementById('r-comp');
+  if (mercado && mercado.concorrentes && mercado.concorrentes.length > 0) {
+    compSection.style.display = '';
+    const allPrices = mercado.concorrentes.map(c => c.preco).concat([r.preco_recomendado]);
+    const maxPrice = Math.max(...allPrices) * 1.1;
+
+    const tagMap = { abaixo:'tag-abaixo', medio:'tag-medio', acima:'tag-acima' };
+    const tagLabel = { abaixo:'Abaixo da média', medio:'Na média', acima:'Acima da média' };
+
+    let html = `<div class="search-badge">🌐 Dados pesquisados agora na internet</div>`;
+    html += `<div class="comp-grid">`;
+
+    // Concorrentes
+    mercado.concorrentes.forEach(c => {
+      const pct = Math.round((c.preco / maxPrice) * 100);
+      const diffPct = mercado.preco_mercado_medio > 0
+        ? Math.round(((c.preco - mercado.preco_mercado_medio) / mercado.preco_mercado_medio) * 100) : 0;
+      const tagCls = diffPct < -10 ? 'tag-abaixo' : diffPct > 10 ? 'tag-acima' : 'tag-medio';
+      const tagTxt = diffPct < -10 ? 'Abaixo da média' : diffPct > 10 ? 'Acima da média' : 'Na média';
+      html += `
+        <div class="comp-item">
+          <div class="comp-name">
+            ${c.nome}
+            <small>${c.fonte}${c.detalhe ? ' · ' + c.detalhe : ''}</small>
+            <span class="comp-tag ${tagCls}">${tagTxt}</span>
+          </div>
+          <div class="comp-bar-wrap">
+            <div class="comp-bar-track"><div class="comp-bar-fill" style="width:${pct}%"></div></div>
+          </div>
+          <div class="comp-price">${fmt(c.preco)}</div>
+        </div>`;
+    });
+
+    // Meu preço
+    const myPct = Math.round((r.preco_recomendado / maxPrice) * 100);
+    const myDiff = mercado.preco_mercado_medio > 0
+      ? Math.round(((r.preco_recomendado - mercado.preco_mercado_medio) / mercado.preco_mercado_medio) * 100) : 0;
+    const myTagCls = myDiff < -10 ? 'tag-abaixo' : myDiff > 10 ? 'tag-acima' : 'tag-medio';
+    const myTagTxt = myDiff < -10 ? 'Abaixo da média' : myDiff > 10 ? 'Acima da média' : 'Na média';
+    html += `
+      <div class="comp-item my-price">
+        <div class="comp-name">
+          <strong>Seu preço recomendado ★</strong>
+          <small>Calculado pela IA para o seu negócio</small>
+          <span class="comp-tag ${myTagCls}">${myTagTxt}</span>
+        </div>
+        <div class="comp-bar-wrap">
+          <div class="comp-bar-track"><div class="comp-bar-fill" style="width:${myPct}%"></div></div>
+        </div>
+        <div class="comp-price">${fmt(r.preco_recomendado)}</div>
+      </div>`;
+
+    html += `</div>`;
+    if (mercado.contexto_mercado) {
+      html += `<p class="comp-source">📌 ${mercado.contexto_mercado}</p>`;
+    }
+    compEl.innerHTML = html;
+  } else {
+    compSection.style.display = 'none';
+  }
+
+  // Prices
+  document.getElementById('r-precos').innerHTML = `
+    <div class="price-card">
+      <div class="price-card-label">Mínimo</div>
+      <div class="price-card-value">${fmt(r.preco_minimo)}</div>
+      <div class="price-card-note">Sem prejuízo</div>
+    </div>
+    <div class="price-card highlight">
+      <div class="price-card-label">Recomendado ★</div>
+      <div class="price-card-value">${fmt(r.preco_recomendado)}</div>
+      <div class="price-card-note">${(r.margem_real||0).toFixed(0)}% de margem</div>
+    </div>
+    <div class="price-card">
+      <div class="price-card-label">Premium</div>
+      <div class="price-card-value">${fmt(r.preco_premium)}</div>
+      <div class="price-card-note">Teto do mercado</div>
+    </div>`;
+
+  // Breakdown
+  const bd = document.getElementById('r-breakdown');
+  bd.innerHTML = '';
+  (r.breakdown||[]).forEach(row => {
+    if (row.val > 0) {
+      const div = document.createElement('div');
+      div.className = 'breakdown-row' + (row.label === 'Lucro' ? ' total' : '');
+      div.innerHTML = `<span class="label">${row.label}</span><span class="val">${fmt(row.val)}</span>`;
+      bd.appendChild(div);
+    }
+  });
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'breakdown-row total';
+  totalDiv.innerHTML = `<span class="label"><strong>Preço final recomendado</strong></span><span class="val">${fmt(r.preco_recomendado)}</span>`;
+  bd.appendChild(totalDiv);
+
+  document.getElementById('r-analise').innerHTML = (r.analise||'').replace(/\n/g,'<br>');
+
+  if (r.alerta && r.alerta.trim()) {
+    document.getElementById('r-alerta-section').style.display = '';
+    document.getElementById('r-alerta').innerHTML = `<div class="alert-box warn">⚠ ${r.alerta}</div>`;
+  } else {
+    document.getElementById('r-alerta-section').style.display = 'none';
+  }
+
+  document.getElementById('r-dicas').innerHTML = (r.dicas||[]).map(t =>
+    `<div class="tip-item"><div class="tip-dot"></div><span>${t}</span></div>`
+  ).join('');
+
+  document.getElementById('result').classList.add('show');
+  setTimeout(() => document.getElementById('result').scrollIntoView({ behavior:'smooth', block:'start' }), 100);
+}
+
+function showErr(msg) {
+  const el = document.getElementById('err');
+  el.textContent = '⚠ ' + msg;
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function resetar() {
+  document.getElementById('result').classList.remove('show');
+  document.getElementById('err').classList.remove('show');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function updateTipo() {
+  // Could customize hints based on type — future enhancement
+}
+</script>
+</body>
+</html>
